@@ -1,0 +1,63 @@
+const { Contract } = require('fabric-contract-api');
+
+class KYCContract extends Contract {
+
+    async initLedger(ctx) {
+        console.info('初始化 KYC 合约');
+    }
+
+    async createKYC(ctx, id, encryptedData) {
+        const kycAsBytes = await ctx.stub.getState(id);
+        if (kycAsBytes && kycAsBytes.length > 0) {
+            throw new Error(`${id} 的 KYC 外網已存在`);
+        }
+
+        const kyc = {
+            id,
+            encryptedData,
+            banks: [],
+            status: 'PENDING'
+        };
+
+        await ctx.stub.putState(id, Buffer.from(JSON.stringify(kyc)));
+        return JSON.stringify(kyc);
+    }
+
+    async approveKYC(ctx, id) {
+        const kycAsBytes = await ctx.stub.getState(id);
+        if (!kycAsBytes || kycAsBytes.length === 0) {
+            throw new Error(`${id} 的 KYC 紀錄不存在`);
+        }
+
+        const kyc = JSON.parse(kycAsBytes.toString());
+        kyc.status = 'APPROVED';
+
+        await ctx.stub.putState(id, Buffer.from(JSON.stringify(kyc)));
+        return JSON.stringify(kyc);
+    }
+
+    async requestAccess(ctx, id, bankId) {
+        const kycAsBytes = await ctx.stub.getState(id);
+        if (!kycAsBytes || kycAsBytes.length === 0) {
+            throw new Error(`${id} 的 KYC 紀錄不存在`);
+        }
+
+        const kyc = JSON.parse(kycAsBytes.toString());
+        if (!kyc.banks.includes(bankId)) {
+            kyc.banks.push(bankId);
+        }
+
+        await ctx.stub.putState(id, Buffer.from(JSON.stringify(kyc)));
+        return JSON.stringify(kyc);
+    }
+
+    async queryKYC(ctx, id) {
+        const kycAsBytes = await ctx.stub.getState(id);
+        if (!kycAsBytes || kycAsBytes.length === 0) {
+            throw new Error(`${id} 的 KYC 紀錄不存在`);
+        }
+        return kycAsBytes.toString();
+    }
+}
+
+module.exports = KYCContract;
